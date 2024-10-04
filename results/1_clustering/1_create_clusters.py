@@ -122,7 +122,6 @@ for year, df_i in tqdm.tqdm(df.groupby(df.index.get_level_values(0).year)):
         index=X_i.columns
     )
     v_times.append(times)
-    # groups_i.to_pickle(f'output_groups/{year}.pkl')
 
 import matplotlib.pyplot as plt
 s = pd.Series({a: np.mean([v_times[x][a] for x in [0, 1]]) for a in
@@ -138,7 +137,6 @@ s = s.rename({'rand': 'Random',
           'dpm': 'DPM'})
 s = s.sort_values()
 ax = s.plot.barh(log=True, figsize=[8.4, 2.4])
-# ax.set_xticklabels(s.index, rotation=30, ha='right')
 plt.title('Mean running time to fit')
 plt.tight_layout()
 plt.savefig('figs/clus_times.pdf')

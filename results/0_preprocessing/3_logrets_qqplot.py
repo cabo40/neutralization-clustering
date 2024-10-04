@@ -3,8 +3,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 import statsmodels.api as sm
 
-import clusters
-
 df = pd.read_pickle('crsp_small.pickle')
 ret = df['RET'].loc['2020-01-01':].unstack()
 grp = df['NAICS'].loc['2020-01-01':].unstack()

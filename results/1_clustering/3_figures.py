@@ -3,64 +3,9 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import pandas as pd
 import numpy as np
-import scipy
 import time
-import cvxopt as opt
-import cvxpy as cp
 import pickle
-
-
-# opt.solvers.options['maxiters'] = 5
-# opt.solvers.options['abstol'] = 1e-5
-# opt.solvers.options['reltol'] = 1e-2
-# opt.solvers.options['feastol'] = 1e-6
-def markowitz_port_old(r: pd.DataFrame):
-    r_mu = r.mean(0).to_numpy()
-    r_mu = np.append(r_mu, 1)
-    r_s = r.cov().to_numpy()
-    r_s = np.append(r_s, [np.ones(r_s.shape[1])], axis=0)
-    w = scipy.optimize.lsq_linear(r_s, r_mu, (0, 1),
-                                  method='trf', lsq_solver='lsmr',
-                                  max_iter=20)["x"]
-    w = w / sum(w)  # Allow for imperfections in fit, not in total allocation
-    return pd.Series(w, index=r.columns)
-
-
-def markowitz_port_old2(r: pd.DataFrame):
-    r_mu = opt.matrix(r.mean(0).to_numpy())
-    r_s = opt.matrix(r.cov().to_numpy())
-    n = len(r_mu)
-    G = -opt.matrix(np.eye(n))  # negative nxn identity matrix
-    h = opt.matrix(0.0, (n, 1))  # n x 1 zero vector
-    A = opt.matrix(1.0, (1, n))  # 1 x n 1-vector
-    b = opt.matrix(1.0)  # [1.0]
-    w = opt.solvers.qp(r_s, -r_mu, G, h, A, b)['x']
-    w = w / sum(w)  # Allow for imperfections in fit, not in total allocation
-    return pd.Series(w, index=r.columns)
-
-
-def markowitz_port(r: pd.DataFrame):
-    r_mu = opt.matrix(r.mean(0).to_numpy())
-    r_mu = r_mu - np.mean(r_mu)
-    r_s = opt.matrix(r.cov().to_numpy())
-    n = len(r_mu)
-    if n == 1:
-        return pd.Series([1.0], index=r.columns)
-    q = opt.matrix(0.0, (n, 1))  # n x 1 zero vector
-    G = -opt.matrix(np.eye(n))  # negative nxn identity matrix
-    h = opt.matrix(0.0, (n, 1))  # n x 1 zero vector
-    A = opt.matrix(r_mu, (1, n))  # 1 x n 1-vector
-    b = opt.matrix(1.0)  # [1.0]
-    try:
-        w = opt.solvers.qp(r_s, q, G, h, A, b)['x']
-    except ValueError:
-        w = np.ones(n)
-    w = w / sum(w)  # Normalization
-    return pd.Series(w, index=r.columns)
-
-
 from pypfopt import EfficientFrontier
-
 
 def markowitz_port_new(r: pd.DataFrame):
     r_mu = r.mean(0).to_numpy()
@@ -83,10 +28,6 @@ def markowitz_port_new(r: pd.DataFrame):
 
 
 df = pd.read_pickle('crsp_small.pickle')
-# rets = df['RET'].unstack()
-
-import glob
-
 clusterings = ['base', 'km', 'kmm', 'agg', 'agg_mirr', 'dbscan', 'gm', 'ddm',
                'dpm', 'rand', 'naics']
 full_names = ['No Clustering',
@@ -119,7 +60,6 @@ for year, df_i in df.groupby(df.index.get_level_values(0).year):
     alpha = -np.log(1 + alpha)
     alpha = alpha / alpha.std()  # divide the std part
     alpha_pivot = alpha.copy(deep=True)  # Copy alpha to reuse for diff clusts
-
     # 'No group' neutralization
     alpha = alpha_pivot.add(-alpha_pivot.mean(axis=1), axis=0)
     alpha = alpha.div(0.5 * alpha.abs().sum(axis=1), axis=0)
@@ -173,7 +113,6 @@ for year, df_i in df.groupby(df.index.get_level_values(0).year):
     last_alpha = last_alpha.loc[last_alpha.index.intersection(alpha.columns)]
     alpha.iloc[0, :].loc[last_alpha.index] = last_alpha
     last_alpha_v['base'] = last_alpha_temp
-    # rets_i = rets_i.replace(np.nan, -1)
     performance2['base'] = pd.concat([performance2['base'],
                                       (alpha * rets_i).sum(1)])
     for x in clusterings[1:]:
@@ -192,8 +131,7 @@ for year, df_i in df.groupby(df.index.get_level_values(0).year):
         performance2[x] = pd.concat([performance2[x],
                                      (alpha * rets_i).sum(1)])
 
-# Performance of momentum strat lagged 1y and forward looking ##########
-
+# Performance of momentum strat lagged 1y and forward looking
 performance3 = {x: pd.Series(dtype=np.float64) for x in clusterings}
 performance4 = {x: pd.Series(dtype=np.float64) for x in clusterings}
 prev_w = {}
@@ -240,7 +178,7 @@ with open('performance.pkl', 'bw') as f:
 with open('time_momentum.pkl', 'bw') as f:
     pickle.dump(time_g, f)
 
-# PLOTS ######
+# PLOTS
 with open('performance.pkl', 'br') as f:
     perf = pickle.load(f)
     performance = perf['meanrev_fwd']
@@ -250,7 +188,7 @@ with open('performance.pkl', 'br') as f:
 with open('time_momentum.pkl', 'br') as f:
     time_g = pickle.load(f)
 
-# Cumulative Returns, Mean Reversion ######
+# Cumulative Returns, Mean Reversion
 perf_p = pd.concat(performance, axis=1)
 perf_p = np.log(1 + perf_p)
 perf_p.columns = full_names
@@ -268,7 +206,6 @@ perf_p = np.log(1 + perf_p)
 perf_p.columns = full_names
 perf_p = perf_p.iloc[:, np.argsort(perf_p.sum())[::-1]]
 perf_p.cumsum().plot(ax=ax[1])
-# ax[1].set_ylabel("Cumulative Log-Returns")
 ax[1].set_xlabel("Date")
 ax[1].legend(fontsize=10, ncols=1, loc='upper left')
 ax[1].set_title("Lagged Groups", fontsize=15)
@@ -278,8 +215,7 @@ fig.tight_layout()
 plt.savefig("figs/mean_rev.pdf")
 plt.show()
 
-# Cumulative Returns, Momentum ######
-
+# Cumulative Returns, Momentum
 perf_p = pd.concat(performance3, axis=1)
 perf_p = np.log(1 + perf_p)
 perf_p.columns = full_names
@@ -297,7 +233,6 @@ perf_p = np.log(1 + perf_p)
 perf_p.columns = full_names
 perf_p = perf_p.iloc[:, np.argsort(perf_p.sum())[::-1]]
 perf_p.cumsum().plot(ax=ax[1])
-# ax[1].set_ylabel("Cumulative Log-Returns")
 ax[1].set_xlabel("Date")
 ax[1].legend(fontsize=10, ncols=1, loc='upper left')
 ax[1].set_title("Lagged", fontsize=15)
@@ -307,7 +242,7 @@ fig.tight_layout()
 plt.savefig("figs/momentum.pdf")
 plt.show()
 
-# Mean Returns and Sharpe, Mean Reversion ##############
+# Mean Returns and Sharpe, Mean Reversion
 perf_p = pd.DataFrame(
     [[performance[x].mean() * 252 * 100,
       performance[x].mean() / performance[x].std() * np.sqrt(252),
@@ -359,8 +294,7 @@ fig.suptitle("         "
 plt.savefig("figs/bars_sharpe_meanrev.pdf")
 plt.show()
 
-# Mean Returns and Sharpe, Momentum ##############
-
+# Mean Returns and Sharpe, Momentum
 perf_p = pd.DataFrame(
     [[performance3[x].add(1).apply(np.log).mean() * 252 * 100,
       performance3[x].add(1).apply(np.log).mean() / performance3[x].add(
@@ -411,12 +345,10 @@ subFigs[1].suptitle("                                  "
                     "Lagged", fontsize=13)
 fig.suptitle("         "
              "Clustering Comparison (2011-2021), Momentum", fontsize=14)
-# plt.tight_layout()
 plt.savefig("figs/bars_sharpe_momentum.pdf")
 plt.show()
 
-# Mutual Information Score ########
-
+# Mutual Information Score
 clusterings_nn = clusterings[1:]
 info_score_base = [[] for x in clusterings_nn]
 for year in np.unique(df.index.get_level_values(0).year):
@@ -431,9 +363,6 @@ perf_p = perf_p.sort_values("Average Mutual Information Score")
 
 plt.figure(figsize=[8.4, 2.4])
 plt.rcParams.update({'font.size': 12})
-# g1 = sns.barplot(x='Average Mutual Information Score', y="Clustering",
-#                  data=perf_p, palette="tab10")
-# g1.set(ylabel=None)
 perf_p.set_index('Clustering').plot.barh(ax=plt.gca())
 plt.gca().get_legend().remove()
 plt.ylabel('')
@@ -442,8 +371,7 @@ plt.tight_layout()
 plt.savefig("figs/MIS.pdf")
 plt.show()
 
-# Silhouette ########
-
+# Silhouette
 clusterings_nn = clusterings[1:]
 silh_score_base = [[] for x in clusterings_nn]
 for year, df_i in df.groupby(df.index.get_level_values(0).year):
@@ -461,9 +389,6 @@ perf_p = pd.DataFrame(silh_score, columns=['Average Silhouette Score',
 perf_p = perf_p.sort_values("Average Silhouette Score")
 plt.figure(figsize=[8.4, 2.4])
 plt.rcParams.update({'font.size': 12})
-# g1 = sns.barplot(x='Average Silhouette Score', y="Clustering",
-#                  data=perf_p, palette="tab10")
-# g1.set(ylabel=None)
 perf_p.set_index('Clustering').plot.barh(ax=plt.gca())
 plt.gca().get_legend().remove()
 plt.ylabel('')
@@ -472,7 +397,7 @@ plt.tight_layout()
 plt.savefig("figs/silh.pdf")
 plt.show()
 
-##### Time to fit Markowitz ###########
+##### Time to fit Markowitz
 import pandas as pd
 import matplotlib.pyplot as plt
 
@@ -483,7 +408,6 @@ ptimes.sum(0).sort_values(ascending=False).plot.bar(log=True)
 plt.xticks(rotation=30, ha='right')
 plt.ylabel("Seconds")
 plt.ylim((100, 15000))
-# plt.xlabel("Method")
 plt.title("Time to Fit Markowitz Portfolio")
 plt.tight_layout()
 plt.savefig("figs/time_momentum.pdf")

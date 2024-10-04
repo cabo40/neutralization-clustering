@@ -58,26 +58,3 @@ rng.shuffle(rand)
 plot_sign(sigmo.iloc[:, rand], 'Random log-returns visualization', ax=ax)
 plt.savefig('figs/rand_viz.png')
 plt.show()
-
-# from sklearn.metrics import silhouette_score
-#
-# silh = {}
-# for i, a in enumerate(groups_i.columns):
-#     silh[a] = silhouette_score(ret.div(ret.std(0), axis=1).T, groups_i[a])
-# s = pd.Series(silh)
-# s = s.rename({'rand': 'Random',
-#               'dbscan': 'DBSCAN',
-#               'km': '$k$-means',
-#               'kmm': '$k$-medians',
-#               'agg': 'Agglomerative(E)',
-#               'agg_mirr': 'Agglomerative(mH)',
-#               'ddm': 'DDM',
-#               'gm': 'GMM',
-#               'dpm': 'DPM',
-#               'naics': 'NAICS'})
-# s = s.sort_values()
-# ax = s.plot.barh(figsize=[6.4, 2.5])
-# plt.title('Average silhouette distance')
-# plt.tight_layout()
-# plt.savefig('figs/silh.pdf')
-# plt.show()
